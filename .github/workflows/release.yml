@@ -1,0 +1,54 @@
+name: Automated Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Trigger only on tags like v1.0.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create the GitHub Release
+
+    steps:
+      - name: Get Release Tag Name
+        id: get_tag
+        run: echo "TAG_NAME=$(echo ${{ github.ref }} | sed 's/refs\/tags\///g')" >> $GITHUB_OUTPUT
+
+      - name: 🔍 Find Artifact ID
+        # Search for the artifact uploaded by the 'build' job on the same commit SHA
+        id: find_artifact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+            const artifact = artifacts.data.artifacts.find(a => a.name.startsWith('project-artifact-'));
+            if (artifact) {
+              core.setOutput('artifact_id', artifact.id);
+            } else {
+              core.setFailed('Could not find the artifact for this run.');
+            }
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          artifact-id: ${{ steps.find_artifact.outputs.artifact_id }}
+          path: ./downloaded-artifact
+
+      - name: Create GitHub Release
+        # This action creates the release and uploads the downloaded artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_tag.outputs.TAG_NAME }}
+          name: Release ${{ steps.get_tag.outputs.TAG_NAME }}
+          draft: false
+          prerelease: false
+          # Point the files to the artifact you just downloaded
+          files: downloaded-artifact/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
