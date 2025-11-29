@@ -115,11 +115,11 @@ done
 
 # 3. Apply the new tag
 echo $VERSION > VERSION
+$SED_CMD -E -i "s/mod_version=[0-9]+\.[0-9]+\.[0-9]+-SEED/mod_version=$VERSION-SEED/" gradle.properties
 echo "Creating release commit..."
 git commit -am "RELEASE: $NEW_TAG"
 echo "Applying tag '$NEW_TAG' to the current commit..."
 git tag "$NEW_TAG"
-$SED_CMD -E -i "s/mod_version=[0-9]+\.[0-9]+\.[0-9]+-SEED/mod_version=$VERSION-SEED/" gradle.properties
 
 if [ $? -eq 0 ]; then
     echo "✅ Success! Tag '$NEW_TAG' applied locally."
