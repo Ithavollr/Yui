@@ -7,6 +7,18 @@ DEFAULT_INCREMENT="patch"
 get_last_version_part() {
     echo "$1" | sed -E "s/.*\.([0-9]+)$/\1/"
 }
+# --- Determine the correct SED command (GNU sed vs BSD sed) ---
+if command -v gsed &>/dev/null; then
+    # GNU sed found (common on macOS via Homebrew)
+    SED_CMD="gsed"
+elif command -v sed &>/dev/null; then
+    # Standard sed found (default on Linux and macOS)
+    SED_CMD="sed"
+else
+    echo "Error: Neither 'gsed' nor 'sed' was found on your system." >&2
+    exit 1
+fi
+echo "Using SED command: $SED_CMD"
 
 # Function to suggest the next version based on the current one
 suggest_next_version() {
@@ -16,7 +28,7 @@ suggest_next_version() {
     local version_only
 
     # Remove the 'v' prefix if present for parsing
-    version_only=$(echo "$current_tag" | sed "s/^v//")
+    version_only=$(echo "$current_tag" | $SED_CMD "s/^v//")
 
     # Split the version into components: major, minor, patch
     IFS='.' read -r major minor patch <<< "$version_only"
@@ -70,7 +82,7 @@ while true; do
         VERSION="$SUGGESTED_TAG"
         NEW_TAG="v$SUGGESTED_TAG"
     else
-        VERSION=$(echo "$NEW_TAG_INPUT" | sed "s/^v//")
+        VERSION=$(echo "$NEW_TAG_INPUT" | $SED_CMD "s/^v//")
         NEW_TAG="$NEW_TAG_INPUT"
     fi
 
@@ -107,7 +119,7 @@ echo "Creating release commit..."
 git commit -am "RELEASE: $NEW_TAG"
 echo "Applying tag '$NEW_TAG' to the current commit..."
 git tag "$NEW_TAG"
-sed -E -i "s/mod_version=[0-9]+\.[0-9]+\.[0-9]+-SEED/mod_version=$VERSION-SEED/" gradle.properties
+$SED_CMD -E -i "s/mod_version=[0-9]+\.[0-9]+\.[0-9]+-SEED/mod_version=$VERSION-SEED/" gradle.properties
 
 if [ $? -eq 0 ]; then
     echo "✅ Success! Tag '$NEW_TAG' applied locally."
