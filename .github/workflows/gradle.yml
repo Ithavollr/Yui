@@ -51,18 +51,27 @@ jobs:
         COMMIT_MSG="${{ github.event.head_commit.message }}"
         if [[ "$COMMIT_MSG" == RELEASE:* ]]; then
           echo "is_release=true" >> $GITHUB_OUTPUT
-          echo "release_body=${COMMIT_MSG#RELEASE:}" >> $GITHUB_OUTPUT
-          # Optional: sanitize the body (trim leading spaces)
-          echo "release_body=$(echo \"${COMMIT_MSG#RELEASE:}\" | sed 's/^[[:space:]]*//')" >> $GITHUB_OUTPUT
         else
           echo "is_release=false" >> $GITHUB_OUTPUT
         fi
 
+    # === Read version from VERSION file ===
+    - name: Read version from VERSION file
+      if: steps.check_release.outputs.is_release == 'true'
+      id: get_version
+      run: |
+        VERSION=$(cat VERSION | tr -d '[:space:]')
+        if [ -z "$VERSION" ]; then
+          echo "ERROR: VERSION file is empty or missing"
+          exit 1
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+      # === Create the release ===
     - name: Create GitHub Release
       if: steps.check_release.outputs.is_release == 'true'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v${{ github.sha }}
-        name: Release ${{ github.sha }}
-        body: ${{ steps.check_release.outputs.release_body }}
+        tag_name: v${{ steps.get_version.outputs.version }}
+        name: v${{ steps.get_version.outputs.version }}
+        # "gbody: ${{ steps.check_release.outputs.release_body }} - comment out, auto-generate via release.yml
         files: build/libs/*SEED.jar

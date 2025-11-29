@@ -1,10 +1,8 @@
 #!/bin/bash
 
 # --- Configuration ---
-TAG_PREFIX="v"
 # You can customize the default increment behavior here (e.g., patch, minor, major)
 DEFAULT_INCREMENT="patch"
-
 # Function to extract the last part of the version (e.g., 2 from v1.2.2)
 get_last_version_part() {
     echo "$1" | sed -E "s/.*\.([0-9]+)$/\1/"
@@ -18,14 +16,14 @@ suggest_next_version() {
     local version_only
 
     # Remove the 'v' prefix if present for parsing
-    version_only=$(echo "$current_tag" | sed "s/^$TAG_PREFIX//")
+    version_only=$(echo "$current_tag" | sed "s/^v//")
 
     # Split the version into components: major, minor, patch
     IFS='.' read -r major minor patch <<< "$version_only"
 
     if [ -z "$major" ] || [ -z "$minor" ] || [ -z "$patch" ]; then
         # If parsing fails or tag format is non-standard, suggest v1.0.0
-        echo "${TAG_PREFIX}1.0.0"
+        echo "v1.0.0"
         return
     fi
 
@@ -45,7 +43,7 @@ suggest_next_version() {
             ;;
     esac
 
-    echo "${TAG_PREFIX}${major}.${minor}.${patch}"
+    echo "${major}.${minor}.${patch}"
 }
 
 
@@ -55,7 +53,7 @@ LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
 if [ $? -ne 0 ] || [ -z "$LATEST_TAG" ]; then
     echo "No existing Git tags found in this repository."
     LATEST_TAG="none"
-    SUGGESTED_TAG="${TAG_PREFIX}1.0.0"
+    SUGGESTED_TAG="$v1.0.0"
 else
     echo "Latest existing tag found: $LATEST_TAG"
     SUGGESTED_TAG=$(suggest_next_version "$LATEST_TAG" "$DEFAULT_INCREMENT")
@@ -65,12 +63,14 @@ echo "---"
 
 # 2. Ask the user for the new tag
 while true; do
-    read -rp "Enter the NEW tag name (e.g. v1.0.0) [Default: $SUGGESTED_TAG]: " NEW_TAG_INPUT
+    read -rp "Enter the NEW tag name (e.g. v1.0.0) [Default: v$SUGGESTED_TAG]: " NEW_TAG_INPUT
 
     # Use the suggested tag if input is empty
     if [ -z "$NEW_TAG_INPUT" ]; then
-        NEW_TAG="$SUGGESTED_TAG"
+        VERSION="$SUGGESTED_TAG"
+        NEW_TAG="v$SUGGESTED_TAG"
     else
+        VERSION=$(echo "$NEW_TAG_INPUT" | sed "s/^v//")
         NEW_TAG="$NEW_TAG_INPUT"
     fi
 
@@ -102,13 +102,18 @@ while true; do
 done
 
 # 3. Apply the new tag
+echo "Creating release commit..."
+git commit -am "RELEASE: $NEW_TAG"
 echo "Applying tag '$NEW_TAG' to the current commit..."
 git tag "$NEW_TAG"
+sed -i -E "s/mod_version=[0-9]+\.[0-9]+\.[0-9]+-SEED/mod_version=$VERSION-SEED/" gradle.properties
+echo $VERSION > VERSION
 
 if [ $? -eq 0 ]; then
     echo "✅ Success! Tag '$NEW_TAG' applied locally."
-    echo "To push this tag to GitHub and trigger the release workflow, run:"
-    echo "  git push --tags"
+    echo "uploading release..."
+    git push --tags
+    git push
 else
     echo "❌ Failed to apply tag '$NEW_TAG'. Check your git status."
 fi
