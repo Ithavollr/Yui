@@ -26,7 +26,7 @@ jobs:
       uses: actions/setup-java@v4
       with:
         java-version: '21'
-        distribution: 'corretto'
+        distribution: 'temurin'
 
     # Configure Gradle for optimal use in GitHub Actions, including caching of downloaded dependencies.
     # See: https://github.com/gradle/actions/blob/main/setup-gradle/README.md
@@ -73,5 +73,4 @@ jobs:
       with:
         tag_name: v${{ steps.get_version.outputs.version }}
         name: v${{ steps.get_version.outputs.version }}
-        # "gbody: ${{ steps.check_release.outputs.release_body }} - comment out, auto-generate via release.yml
         files: build/libs/*SEED.jar
